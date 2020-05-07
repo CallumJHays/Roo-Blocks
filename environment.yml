@@ -1,0 +1,15 @@
+name: roo-blocks
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python==3.8
+  - pip==20.1
+  - nodejs==13.13.0
+  - pip:
+      - micropy-cli==3.3.0
+      - esptool==2.8.0
+      - adafruit-ampy==1.0.7
+      - mpy-cross==1.12

@@ -1,0 +1,24 @@
+{
+    "python.linting.enabled": true,
+    "python.jediEnabled": false,
+    "python.autoComplete.extraPaths": [
+        ".micropy\\BradenM-micropy-stubs-9569403\\frozen",
+        ".micropy\\BradenM-micropy-stubs-27ee48a\\frozen",
+        ".micropy\\BradenM-micropy-stubs-9569403\\stubs",
+        ".micropy\\controller"
+    ],
+    "python.autoComplete.typeshedPaths": [
+        ".micropy\\BradenM-micropy-stubs-9569403\\frozen",
+        ".micropy\\BradenM-micropy-stubs-27ee48a\\frozen",
+        ".micropy\\BradenM-micropy-stubs-9569403\\stubs",
+        ".micropy\\controller"
+    ],
+    "python.analysis.typeshedPaths": [
+        ".micropy\\BradenM-micropy-stubs-9569403\\frozen",
+        ".micropy\\BradenM-micropy-stubs-27ee48a\\frozen",
+        ".micropy\\BradenM-micropy-stubs-9569403\\stubs",
+        ".micropy\\controller"
+    ],
+    "python.linting.pylintEnabled": true,
+    "python.pythonPath": "C:\\Users\\cal\\Miniconda3\\envs\\roo-blocks\\python.exe"
+}
