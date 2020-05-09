@@ -1,5 +1,7 @@
-import parseWorkspaceXml from "./parseWorkspaceXml";
-import ToolboxXml from "./toolbox.xml";
-export * as WORKSPACE_XML from "./workspace.xml";
+import raw from "raw.macro"
 
-export const TOOLBOX = parseWorkspaceXml(ToolboxXml);
+import parseWorkspaceXml from "./parseWorkspaceXml";
+
+export const WORKSPACE_XML = raw("./workspace.xml");
+
+export const TOOLBOX_CATEGORIES = parseWorkspaceXml(raw("./toolbox.xml"));

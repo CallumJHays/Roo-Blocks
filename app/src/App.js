@@ -1,125 +1,35 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 import ReactBlockly from "react-blockly";
 
-import ToolboxXML from "./blockly/toolbox.xml";
-import WorkspaceXML from "./blockly/workspace.xml";
+import { TOOLBOX_CATEGORIES, WORKSPACE_XML } from "./blockly";
 
 import "./App.css";
 
-console.log(ToolboxXML, WorkspaceXML);
-`i'''''''''''''''''''''''''''''''''''''''''''''''''''
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-''
-
-
-
-`;
+const OG_CONSOLE_ERROR = console.error;
+
+let usedIgnoreBenignReactBlocklyErrors = false;
+function useIgnoreBenignReactBlocklyErrors() {
+  if (!usedIgnoreBenignReactBlocklyErrors) {
+    console.error = function(e) {
+      if (!e.includes("The tag <%s> is unrecognized in this browser.")) {
+        OG_CONSOLE_ERROR(arguments)
+      }
+    }
+  }
+
+  useEffect(() => () => {
+    console.error = OG_CONSOLE_ERROR;
+  }, [])
+}
 
 function App() {
+  useIgnoreBenignReactBlocklyErrors()
+
   return (
     <div className="App">
       <ReactBlockly.BlocklyEditor
-        toolboxCategories={ToolboxXML}
+        toolboxCategories={TOOLBOX_CATEGORIES}
         workspaceConfiguration={{
           grid: {
             spacing: 20,
@@ -128,7 +38,7 @@ function App() {
             snap: true,
           },
         }}
-        initialXml={WorkspaceXML}
+        initialXml={WORKSPACE_XML}
         wrapperDivClassName="fill-height"
       />
     </div>

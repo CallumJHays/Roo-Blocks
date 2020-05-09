@@ -19,6 +19,11 @@ conda activate roo-blocks
 
 ## Flashing the ESP32
 
+If on linux, you need full r/w access to usb serial. Add yourself with:
+```bash
+sudo adduser <USER> dialout
+```
+
 Replace serial port below.
 For Windows this will look like COM12 found in windows device manager.
 For linux this will look like ttyUSB0.
@@ -29,3 +34,25 @@ esptool --port /dev/ttyUSB0 erase_flash
 esptool --port /dev/ttyUSB0 write_flash -z 0x1000 esp32-idf4-v1.12.bin
 ```
 
+## Uploading main.py
+```bash
+cd controller
+ampy
+```
+
+# Running the App
+
+In order to utilise local ble devices, the script either needs to be run with `sudo` or capabilities granted to `node` with:
+```bash
+sudo setcap cap_net_raw+eip $(readlink -f $(which node))
+```
+
+Unfortunately granting capabilities to a `conda` binary will [break it's ability to resolve dynamic libraries, such as libnode.so](https://github.com/conda/conda/issues/8984).
+
+Running the app with sudo in the conda environment is done with:
+
+```bash
+conda activate roo-blocks
+cd app
+sudo env "PATH=$PATH" npm start
+```

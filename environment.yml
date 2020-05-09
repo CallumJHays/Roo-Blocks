@@ -13,3 +13,4 @@ dependencies:
       - esptool==2.8.0
       - adafruit-ampy==1.0.7
       - mpy-cross==1.12
+      - pygatt[GATTTOOL]==4.0.5

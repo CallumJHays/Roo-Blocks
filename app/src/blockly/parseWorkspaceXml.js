@@ -13,14 +13,14 @@ export default function parseWorkspaceXml(xml) {
   let xmlDoc = null;
   if (window.DOMParser) {
     xmlDoc = new DOMParser().parseFromString(xml, "text/xml");
-  } else if (window.ActiveXObject) {
-    xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
-    xmlDoc.async = false;
-    if (!xmlDoc.loadXML(xml)) {
-      throw new Error(
-        `${xmlDoc.parseError.reason} ${xmlDoc.parseError.srcText}`
-      );
-    }
+  // } else if (window.ActiveXObject) {
+  //   xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
+  //   xmlDoc.async = false;
+  //   if (!xmlDoc.loadXML(xml)) {
+  //     throw new Error(
+  //       `${xmlDoc.parseError.reason} ${xmlDoc.parseError.srcText}`
+  //     );
+  //   }
   } else {
     throw new Error("cannot parse xml string!");
   }

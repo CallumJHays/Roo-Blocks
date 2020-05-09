@@ -2,6 +2,18 @@ const { app, BrowserWindow } = require("electron");
 
 const path = require("path");
 const url = require("url");
+// const ipc = require('node-ipc');
+// const { exec } = require("child_process");
+
+// ipc.serve('/tmp/roo-blocks.sock', () => {
+//   ipc.server.on('message', (data, socket) => {
+//     console.log('got message from client!', data, socket);
+//   })
+//   ipc.server.on('socket.disconnected', (socket, id) => {
+//     throw new Error(`socket ${socket} with id ${id} died`);
+//   });
+//   exec('python ./src/bluetooth.py')
+// })
 
 let mainWindow;
 
@@ -13,6 +25,7 @@ function createWindow() {
       nodeIntegration: true,
     },
   });
+  // mainWindow.maximize();
 
   mainWindow.loadURL(
     process.env.ELECTRON_START_URL ||
@@ -41,3 +54,5 @@ app.on("activate", () => {
     createWindow();
   }
 });
+
+// ipc.server.start();
