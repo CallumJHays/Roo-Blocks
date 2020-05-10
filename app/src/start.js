@@ -46,9 +46,9 @@ function createWindow() {
       }
     });
 
-    ipcMain.on("bluetooth", (chunk) => {
+    ipcMain.on("bluetooth", (_, chunk) => {
       console.log("relaying ipc from react to python", chunk);
-      client.write(chunk);
+      client.write(chunk + "\n");
     });
 
     client.on("end", (socket, id) => {

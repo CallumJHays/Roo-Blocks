@@ -33,16 +33,33 @@ function useIgnoreBenignReactBlocklyErrors() {
 
 function CodeExecutor() {
   const [uploaded, setUploaded] = useState(null);
+
+  useEffect(() => {
+    const handleUploadProgress = (_, msg) => {
+      setUploaded(msg);
+    };
+    window.ipcRenderer.on("upload", handleUploadProgress);
+    return () =>
+      window.ipcRenderer.removeListener("upload", handleUploadProgress);
+  }, []);
+
   return (
     <div>
       <Button
         variant="success"
         disabled={uploaded !== null}
         onClick={() => {
-          setUploaded(50);
+          window.ipcRenderer.send(
+            "bluetooth",
+            JSON.stringify({
+              type: "upload",
+              data: "Procfile",
+            })
+          );
+          setUploaded(0);
         }}
       >
-        Play
+        {uploaded === null ? "Play" : `Uploading`}
       </Button>
       {uploaded !== null ? (
         <ProgressBar
@@ -50,7 +67,7 @@ function CodeExecutor() {
           style={{ width: 200, marginTop: 10 }}
           animated
           now={uploaded}
-          label={`Uploading...`}
+          label={`${uploaded}%`}
         />
       ) : null}
     </div>
@@ -62,9 +79,12 @@ function ConnectionMenu() {
   const [ellipsis, setEllipsis] = useState("");
 
   useEffect(() => {
-    window.ipcRenderer.on("connected", (_, msg) => {
+    const handleConnected = (_, msg) => {
       setConnected(msg);
-    });
+    };
+    window.ipcRenderer.on("connected", handleConnected);
+    return () =>
+      window.ipcRenderer.removeListener("connected", handleConnected);
   }, []);
 
   useEffect(() => {
