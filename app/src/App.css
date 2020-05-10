@@ -3,13 +3,32 @@
   height: 100vh;
 }
 
+.menu {
+  height: 100px;
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  height: 90%;
+}
+
+.play-button {
+  color: green;
+  font-size: 30px;
+}
+
+.spaced {
+  margin: 0 10px 0 10px;
+}
+
 .App-logo {
   height: 40vmin;
   pointer-events: none;
 }
 
 .fill-height {
-  height: 100%;
+  height: calc(100vh - 100px);
 }
 
 @media (prefers-reduced-motion: no-preference) {

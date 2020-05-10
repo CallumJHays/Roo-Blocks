@@ -10,8 +10,8 @@ import time
 
 from advertising import advertising_payload
 
-_IRQ_CENTRAL_CONNECT                 = const(1 << 0)
-_IRQ_CENTRAL_DISCONNECT              = const(1 << 1)
+_IRQ_CENTRAL_CONNECT = const(1 << 0)
+_IRQ_CENTRAL_DISCONNECT = const(1 << 1)
 # _IRQ_GATTS_WRITE                     = const(1 << 2)
 # _IRQ_GATTS_READ_REQUEST              = const(1 << 3)
 # _IRQ_GATTC_SERVICE_RESULT            = const(1 << 8)
@@ -80,7 +80,7 @@ execution_service_id = bt.UUID(BLE_GENERIC_ACCESS_SERVICE)
 # def main():
 #     ble = bluetooth.BLE()
 #     ble.active(True)
-#     # on 
+#     # on
 #     ble.irq(lamn)
 #     temp = BLETemperature(ble)
 
@@ -113,24 +113,31 @@ upload_service, execution_service = ble.gatts_register_services([
     )])
 ])
 
+
 def advertise():
+    adv_data = advertising_payload(
+        name="Roo-Blocks",
+        services=[upload_service_id, execution_service_id]
+    )
+    print('advertising', adv_data)
     ble.gap_advertise(
-        interval_us=500000, # seems to work well
-        adv_data=advertising_payload(
-            name="Roo-Blocks",
-            services=[upload_service_id, execution_service_id]
-        )
+        interval_us=500000,  # seems to work well
+        adv_data=adv_data
     )
 
+
 connection = None
+
+
 def on_central_msg(event, data):
     global connection
 
     if event == _IRQ_CENTRAL_CONNECT:
         connection, _, _, = data
-        ble.gap_advertise(None) # stop advertising
+        ble.gap_advertise(None)  # stop advertising
     elif event == _IRQ_CENTRAL_DISCONNECT:
         connection = None
+
 
 ble.irq(on_central_msg)
 advertise()

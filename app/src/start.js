@@ -2,27 +2,17 @@ const { app, BrowserWindow } = require("electron");
 
 const path = require("path");
 const url = require("url");
-// const ipc = require('node-ipc');
-// const { exec } = require("child_process");
-
-// ipc.serve('/tmp/roo-blocks.sock', () => {
-//   ipc.server.on('message', (data, socket) => {
-//     console.log('got message from client!', data, socket);
-//   })
-//   ipc.server.on('socket.disconnected', (socket, id) => {
-//     throw new Error(`socket ${socket} with id ${id} died`);
-//   });
-//   exec('python ./src/bluetooth.py')
-// })
+const ipcMain = require("electron").ipcMain;
+const fs = require("fs");
+const net = require("net");
 
 let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
     webPreferences: {
       nodeIntegration: true,
+      preload: path.join(__dirname, "./preload.js"),
     },
   });
   // mainWindow.maximize();
@@ -39,6 +29,40 @@ function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+
+  const ipcServer = net.createServer((client) => {
+    let buffer = [];
+
+    client.on("data", (chunk) => {
+      const chunkStr = chunk.toString();
+      buffer.push(chunkStr);
+      const NEWLINE_PATTERN = /\r?\n$/;
+      if (chunkStr.match(NEWLINE_PATTERN)) {
+        [rawMessage, ...buffer] = buffer.join("").split(NEWLINE_PATTERN);
+
+        const message = JSON.parse(rawMessage);
+        console.log("relaying ipc from python to react", message);
+        mainWindow.webContents.send(message.type, message.data);
+      }
+    });
+
+    ipcMain.on("bluetooth", (chunk) => {
+      console.log("relaying ipc from react to python", chunk);
+      client.write(chunk);
+    });
+
+    client.on("end", (socket, id) => {
+      throw new Error(`socket ${socket} with id ${id} died`);
+    });
+  });
+
+  ipcServer.listen(process.env.IPC_SOCKET);
+  ipcServer.on("error", (e) => {
+    if (e.code === "EADDRINUSE") {
+      fs.unlinkSync(process.env.IPC_SOCKET);
+      ipcServer.listen(process.env.IPC_SOCKET);
+    }
+  });
 }
 
 app.on("ready", createWindow);
@@ -54,5 +78,3 @@ app.on("activate", () => {
     createWindow();
   }
 });
-
-// ipc.server.start();

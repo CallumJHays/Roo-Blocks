@@ -17,6 +17,12 @@ Ensure that you always activate the `roo-blocks` environment before you do anyth
 conda activate roo-blocks
 ```
 
+## Give script bluetooth access
+```bash
+cd app
+sudo setcap cap_net_raw+eip bluetooth.py
+```
+
 ## Flashing the ESP32
 
 If on linux, you need full r/w access to usb serial. Add yourself with:
@@ -48,11 +54,3 @@ sudo setcap cap_net_raw+eip $(readlink -f $(which node))
 ```
 
 Unfortunately granting capabilities to a `conda` binary will [break it's ability to resolve dynamic libraries, such as libnode.so](https://github.com/conda/conda/issues/8984).
-
-Running the app with sudo in the conda environment is done with:
-
-```bash
-conda activate roo-blocks
-cd app
-sudo env "PATH=$PATH" npm start
-```
