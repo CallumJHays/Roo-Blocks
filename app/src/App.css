@@ -29,6 +29,7 @@
 
 .fill-height {
   height: calc(100vh - 100px);
+  text-align: left;
 }
 
 @media (prefers-reduced-motion: no-preference) {

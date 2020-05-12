@@ -14,12 +14,15 @@ import time
 import os
 import json
 from async_timeout import timeout
+import threading
 
 # these characteristics have to be copied into bluetooth.py too
-EXECUTION_STAGE_CHARACTERISTIC = "5497c8f9-6163-4fbd-b372-7a1d9e77168d"
+STATE_CHARACTERISTIC = "5497c8f9-6163-4fbd-b372-7a1d9e77168d"
 UPLOAD_BUFFER_CHARACTERISTIC = "aa86a5d5-95f9-4c0b-8797-44b48a85f686"
 # bytes that can be transferred at a time
 UPLOAD_BUFFER_CHARACTERISTIC_MTU = 512
+UPLOADING_STATE = b'uploading'
+IDLE_STATE = b'idle'
 
 IPC_SOCKET = os.environ.get('IPC_SOCKET')
 
@@ -33,23 +36,46 @@ def json_ipc(msg_type, data):
     }) + '\n').encode()
 
 
-async def upload_program(roo_blocks, program_file):
-    with open(program_file, 'rb') as program:
-        while True:
-            chunk = program.read(UPLOAD_BUFFER_CHARACTERISTIC_MTU)
-            if not chunk:  # finished
-                break
-            roo_blocks.char_write(
-                UPLOAD_BUFFER_CHARACTERISTIC,
-                chunk
-            )
-            ack = asyncio.Future()
+def upload_program(roo_blocks, program, progress_cb):
+    print('writing program to flash over ble...')
+    roo_blocks.char_write(STATE_CHARACTERISTIC, UPLOADING_STATE)
+    received_notification = False
 
-            def handle_notify():
-                ack.set_result(None)
-                print('notify handled')
-            roo_blocks.subscribe(UPLOAD_BUFFER_CHARACTERISTIC, handle_notify)
-            await ack
+    def handle_notify(_a, _b):
+        nonlocal received_notification
+        received_notification = True
+        print('received notification')
+    roo_blocks.subscribe(UPLOAD_BUFFER_CHARACTERISTIC, handle_notify)
+
+    program_size = len(program)
+
+    for offset in range(0, program_size, UPLOAD_BUFFER_CHARACTERISTIC_MTU):
+        received_notification = False
+        roo_blocks.char_write(
+            UPLOAD_BUFFER_CHARACTERISTIC,
+            program[offset:offset + UPLOAD_BUFFER_CHARACTERISTIC_MTU].encode()
+        )
+
+        # this is hacky but I couldn't get the subscribe callback wrapped in a future properly.
+        # It has something to do with the pygatt device event loop being run on a separate thread.
+        # this causes the future to be cancelled most of the time but I can't figure out why.
+        # Even when it doesn't cancel (intermittently), the main thread hangs on await
+        # (the future isn't notifying the executor properly across threads)
+        while not received_notification:
+            time.sleep(0.01)
+
+        progress_cb(
+            round(
+                min(
+                    offset + UPLOAD_BUFFER_CHARACTERISTIC_MTU,
+                    program_size)
+                / program_size,
+                2)
+            * 100)
+
+    print('setting idle')
+    roo_blocks.char_write(STATE_CHARACTERISTIC, IDLE_STATE)
+    print('done!')
 
 
 def connect_ble(uuid):
@@ -57,7 +83,7 @@ def connect_ble(uuid):
     roo_blocks.bond()  # encrypt connection
 
     def on_disconnect(_e):
-        nonlocal roo_blocks
+        global roo_blocks
         roo_blocks = None
         print('disconnected')
     roo_blocks.register_disconnect_callback(on_disconnect)
@@ -97,10 +123,13 @@ async def main():
                         buffer = await reader.readline()
                         if buffer:
                             msg = json.loads(buffer)
+                            print(msg)
                             if msg['type'] == 'upload':
-                                await upload_program(roo_blocks, msg['data'])
-                        else:
-                            raise "IPC connection closed unexpectedly"
+                                # this function should be async but there are some issues with implementation
+                                upload_program(
+                                    roo_blocks,
+                                    msg['data'],
+                                    lambda progress: writer.write(json_ipc('upload', progress)))
                 except asyncio.exceptions.TimeoutError:
                     pass
 

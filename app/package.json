@@ -6,6 +6,7 @@
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
+    "blockly": "^3.20200402.1",
     "bootstrap": "^4.4.1",
     "electron": "^8.2.5",
     "node-ipc": "^9.1.1",
@@ -14,7 +15,8 @@
     "react-blockly": "^5.0.0",
     "react-bootstrap": "^1.0.1",
     "react-dom": "^16.13.1",
-    "react-scripts": "3.4.1"
+    "react-scripts": "3.4.1",
+    "react-syntax-highlighter": "^12.2.1"
   },
   "scripts": {
     "start": "nf start -p 3000",

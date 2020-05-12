@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from "react";
 
 import ReactBlockly from "react-blockly";
+import blockly from "blockly";
+import blocklyPython from "blockly/python";
 
-import { TOOLBOX_CATEGORIES, WORKSPACE_XML } from "./blockly";
+import {
+  TOOLBOX_CATEGORIES,
+  WORKSPACE_XML,
+  setupCustomBlocks,
+} from "./blockly";
 import Button from "react-bootstrap/Button";
 import ProgressBar from "react-bootstrap/ProgressBar";
+import Modal from "react-bootstrap/Modal";
+import ReactSyntaxHighlighter from "react-syntax-highlighter";
 
 import "./App.css";
 import logo from "./logo.png";
+
+setupCustomBlocks(blockly);
 
 const OG_CONSOLE_ERROR = console.error;
 
@@ -31,12 +41,12 @@ function useIgnoreBenignReactBlocklyErrors() {
   );
 }
 
-function CodeExecutor() {
+function CodeExecutor({ pythonCode }) {
   const [uploaded, setUploaded] = useState(null);
 
   useEffect(() => {
     const handleUploadProgress = (_, msg) => {
-      setUploaded(msg);
+      setUploaded(msg === 100 ? null : msg);
     };
     window.ipcRenderer.on("upload", handleUploadProgress);
     return () =>
@@ -53,7 +63,7 @@ function CodeExecutor() {
             "bluetooth",
             JSON.stringify({
               type: "upload",
-              data: "Procfile",
+              data: pythonCode,
             })
           );
           setUploaded(0);
@@ -74,7 +84,7 @@ function CodeExecutor() {
   );
 }
 
-function ConnectionMenu() {
+function ConnectionMenu({ pythonCode }) {
   const [connected, setConnected] = useState(false);
   const [ellipsis, setEllipsis] = useState("");
 
@@ -101,8 +111,7 @@ function ConnectionMenu() {
   return (
     <>
       <div className="connection spaced">
-        Bluetooth <br />
-        Connection:
+        Bluetooth: &nbsp;&nbsp;
         <br />
         {connected ? (
           <span style={{ color: "green" }}>Connected</span>
@@ -110,20 +119,49 @@ function ConnectionMenu() {
           <span style={{ color: "orange" }}>Searching{ellipsis}</span>
         )}
       </div>
-      {connected ? <CodeExecutor /> : null}
+      {connected ? <CodeExecutor pythonCode={pythonCode} /> : null}
     </>
   );
 }
 
 function App() {
   useIgnoreBenignReactBlocklyErrors();
+  const [workspace, setWorkspace] = useState(null);
+  const [showPythonCode, setShowPythonCode] = useState(false);
+
+  const handleClosePythonCode = () => setShowPythonCode(false);
+  const pythonCode = workspace ? workspace.pythonCode : "";
 
   return (
     <div className="App">
       <div className="menu">
         <img src={logo} className="logo spaced" alt="logo"></img>
-        <ConnectionMenu />
+        <ConnectionMenu pythonCode={pythonCode} />
+        <Button
+          onClick={() => setShowPythonCode(true)}
+          className="spaced"
+          style={{ marginLeft: "auto" }}
+          variant="outline-secondary"
+        >
+          Show Python
+        </Button>
+        <Modal show={showPythonCode} onHide={handleClosePythonCode}>
+          <Modal.Header closeButton>
+            <Modal.Title>Generated Python Code</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <ReactSyntaxHighlighter language="python">
+              {pythonCode}
+            </ReactSyntaxHighlighter>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleClosePythonCode}>
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
       </div>
+
       <ReactBlockly.BlocklyEditor
         toolboxCategories={TOOLBOX_CATEGORIES}
         workspaceConfiguration={{
@@ -134,8 +172,16 @@ function App() {
             snap: true,
           },
         }}
-        initialXml={WORKSPACE_XML}
+        initialXml={workspace ? workspace.xml : WORKSPACE_XML}
         wrapperDivClassName="fill-height"
+        workspaceDidChange={(workspace) => {
+          setWorkspace({
+            xml: blockly.Xml.domToText(blockly.Xml.workspaceToDom(workspace)),
+            pythonCode:
+              "import roo_blocks\n\n" +
+              blocklyPython.workspaceToCode(workspace),
+          });
+        }}
       />
     </div>
   );
