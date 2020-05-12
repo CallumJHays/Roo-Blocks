@@ -10,8 +10,9 @@ import {
   setupCustomBlocks,
 } from "./blockly";
 import Button from "react-bootstrap/Button";
-import ProgressBar from "react-bootstrap/ProgressBar";
+import ButtonGroup from "react-bootstrap/ButtonGroup";
 import Modal from "react-bootstrap/Modal";
+import FormControl from "react-bootstrap/FormControl";
 import ReactSyntaxHighlighter from "react-syntax-highlighter";
 
 import "./App.css";
@@ -41,61 +42,104 @@ function useIgnoreBenignReactBlocklyErrors() {
   );
 }
 
-function CodeExecutor({ pythonCode }) {
-  const [uploaded, setUploaded] = useState(null);
+async function formatPythonCode(code) {
+  window.ipcRenderer.send(
+    "python",
+    JSON.stringify({
+      type: "format",
+      data: code,
+    })
+  );
+  let handleFormatted;
+  const formatted = await new Promise((resolve) => {
+    handleFormatted = (_, msg) => resolve(msg);
+    window.ipcRenderer.on("formatted", handleFormatted);
+  });
+  window.ipcRenderer.removeListener("formatted", handleFormatted);
+  return formatted;
+}
 
+function useIpcSubscription(channel, handler) {
   useEffect(() => {
-    const handleUploadProgress = (_, msg) => {
-      setUploaded(msg === 100 ? null : msg);
+    const handle = (_, msg) => {
+      handler(msg);
     };
-    window.ipcRenderer.on("upload", handleUploadProgress);
-    return () =>
-      window.ipcRenderer.removeListener("upload", handleUploadProgress);
+    window.ipcRenderer.on(channel, handle);
+    return () => window.ipcRenderer.removeListener(channel, handle);
+    // eslint-disable-next-line
   }, []);
+}
+
+function CodeExecutor({ workspace }) {
+  const [uploading, setUploading] = useState(null);
+  const [executing, setExecuting] = useState(false);
+  const [delay, setDelay] = useState(1.0);
+
+  useIpcSubscription("upload", (progress) => {
+    if (progress === 100) {
+      setUploading(false);
+      setExecuting(true);
+    }
+  });
 
   return (
     <div>
-      <Button
-        variant="success"
-        disabled={uploaded !== null}
-        onClick={() => {
-          window.ipcRenderer.send(
-            "bluetooth",
-            JSON.stringify({
-              type: "upload",
-              data: pythonCode,
-            })
-          );
-          setUploaded(0);
-        }}
-      >
-        {uploaded === null ? "Play" : `Uploading`}
-      </Button>
-      {uploaded !== null ? (
-        <ProgressBar
-          className="spaced"
-          style={{ width: 200, marginTop: 10 }}
-          animated
-          now={uploaded}
-          label={`${uploaded}%`}
+      <ButtonGroup>
+        <Button
+          variant="outline-success"
+          disabled={uploading || executing}
+          style={{
+            cursor: executing ? "not-allowed" : uploading ? "wait" : "pointer",
+          }}
+          onClick={() => {
+            blocklyPython.STATEMENT_SUFFIX = "roo_blocks.pause(%1)\n";
+            window.ipcRenderer.send(
+              "python",
+              JSON.stringify({
+                type: "upload",
+                data:
+                  "import roo_blocks\n\n" +
+                  blocklyPython.workspaceToCode(workspace),
+              })
+            );
+            blocklyPython.STATEMENT_SUFFIX = null;
+            setUploading(true);
+          }}
+        >
+          {uploading ? "Uploading" : "▶"}
+        </Button>
+        <Button
+          variant="outline-warning"
+          disabled={true}
+          style={{ cursor: executing ? "pointer" : "not-allowed" }}
+        >
+          ⏸
+        </Button>
+        <Button
+          variant="outline-danger"
+          disabled={true}
+          style={{ cursor: executing ? "pointer" : "not-allowed" }}
+        >
+          ↺
+        </Button>
+      </ButtonGroup>
+      <div className="spaced" style={{ width: 70, display: "inline-block" }}>
+        Delay (s) <br />
+        <FormControl
+          type="number"
+          value={delay}
+          onChange={(e) => setDelay(e.target.value)}
         />
-      ) : null}
+      </div>
     </div>
   );
 }
 
-function ConnectionMenu({ pythonCode }) {
+function ConnectionMenu({ workspace }) {
   const [connected, setConnected] = useState(false);
   const [ellipsis, setEllipsis] = useState("");
 
-  useEffect(() => {
-    const handleConnected = (_, msg) => {
-      setConnected(msg);
-    };
-    window.ipcRenderer.on("connected", handleConnected);
-    return () =>
-      window.ipcRenderer.removeListener("connected", handleConnected);
-  }, []);
+  useIpcSubscription("connected", setConnected);
 
   useEffect(() => {
     if (!connected) {
@@ -111,7 +155,7 @@ function ConnectionMenu({ pythonCode }) {
   return (
     <>
       <div className="connection spaced">
-        Bluetooth: &nbsp;&nbsp;
+        Bluetooth:
         <br />
         {connected ? (
           <span style={{ color: "green" }}>Connected</span>
@@ -119,7 +163,7 @@ function ConnectionMenu({ pythonCode }) {
           <span style={{ color: "orange" }}>Searching{ellipsis}</span>
         )}
       </div>
-      {connected ? <CodeExecutor pythonCode={pythonCode} /> : null}
+      {connected ? <CodeExecutor workspace={workspace} /> : null}
     </>
   );
 }
@@ -132,6 +176,12 @@ function App() {
   const handleClosePythonCode = () => setShowPythonCode(false);
   const pythonCode = workspace ? workspace.pythonCode : "";
 
+  // kinda effect-ful, but should be fine
+  useIpcSubscription(
+    "highlight",
+    workspace ? workspace.workspace.highlightBlock : () => {}
+  );
+
   return (
     <div className="App">
       <div className="menu">
@@ -140,12 +190,11 @@ function App() {
         <Button
           onClick={() => setShowPythonCode(true)}
           className="spaced"
-          style={{ marginLeft: "auto" }}
           variant="outline-secondary"
         >
           Show Python
         </Button>
-        <Modal show={showPythonCode} onHide={handleClosePythonCode}>
+        <Modal size="lg" show={showPythonCode} onHide={handleClosePythonCode}>
           <Modal.Header closeButton>
             <Modal.Title>Generated Python Code</Modal.Title>
           </Modal.Header>
@@ -174,13 +223,17 @@ function App() {
         }}
         initialXml={workspace ? workspace.xml : WORKSPACE_XML}
         wrapperDivClassName="fill-height"
-        workspaceDidChange={(workspace) => {
-          setWorkspace({
-            xml: blockly.Xml.domToText(blockly.Xml.workspaceToDom(workspace)),
-            pythonCode:
-              "import roo_blocks\n\n" +
-              blocklyPython.workspaceToCode(workspace),
-          });
+        workspaceDidChange={async (workspace) => {
+          const xml = blockly.Xml.domToText(
+            blockly.Xml.workspaceToDom(workspace)
+          );
+          const pythonCode =
+            "import roo_blocks\n\n" + blocklyPython.workspaceToCode(workspace);
+          setWorkspace({ workspace, xml, pythonCode });
+          try {
+            const formatted = await formatPythonCode(pythonCode);
+            setWorkspace({ workspace, xml, pythonCode: formatted });
+          } catch {}
         }}
       />
     </div>

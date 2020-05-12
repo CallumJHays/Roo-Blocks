@@ -7,10 +7,14 @@ import sys
 # these constants have to be copied into bluetooth.py too
 STATE_CHARACTERISTIC = "5497c8f9-6163-4fbd-b372-7a1d9e77168d"
 UPLOAD_BUFFER_CHARACTERISTIC = "aa86a5d5-95f9-4c0b-8797-44b48a85f686"
+DELAY_CHARACTERISTIC = "9d4e5866-d299-44f6-8733-6ab2d67b46b9"
+TELEM_CHARACTERISTIC = "785b926d-72fd-4b3e-bd03-e14800480792"
 # bytes that can be transferred at a time
 UPLOAD_BUFFER_CHARACTERISTIC_MTU = 512
 UPLOADING_STATE = b'uploading'
 IDLE_STATE = b'idle'
+EXECUTING_STATE = b'executing'
+PAUSED_STATE = b'paused'
 
 _IRQ_CENTRAL_CONNECT = const(1 << 0)
 _IRQ_CENTRAL_DISCONNECT = const(1 << 1)
@@ -20,21 +24,22 @@ ble = bt.BLE()
 ble.active(True)
 
 BLE_GENERIC_ACCESS_SERVICE = const(0x1800)
+roo_blocks_service = bt.UUID(BLE_GENERIC_ACCESS_SERVICE)
 
-upload_service_id = bt.UUID(BLE_GENERIC_ACCESS_SERVICE)
-state_service_id = bt.UUID(BLE_GENERIC_ACCESS_SERVICE)
-
-(upload_buffer_attr,), (state_attr,) = ble.gatts_register_services([
+((upload_buffer_attr, state_attr, delay_attr, telem_attr),) = ble.gatts_register_services([
     # code upload service
-    (upload_service_id, [(
+    (roo_blocks_service, [(
         bt.UUID(UPLOAD_BUFFER_CHARACTERISTIC),
         bt.FLAG_NOTIFY | bt.FLAG_WRITE,
-    )]),
-
-    # state service (executing block "x"(int), b"uploading", b"idle")
-    (state_service_id, [(
+    ), (
         bt.UUID(STATE_CHARACTERISTIC),
-        bt.FLAG_NOTIFY | bt.FLAG_WRITE,
+        bt.FLAG_WRITE,
+    ), (
+        bt.UUID(DELAY_CHARACTERISTIC),
+        bt.FLAG_WRITE,
+    ), (
+        bt.UUID(TELEM_CHARACTERISTIC),
+        bt.FLAG_NOTIFY,
     )])
 ])
 
@@ -86,12 +91,13 @@ def advertise():
         interval_us=500000,  # seems to work well
         adv_data=advertising_payload(
             name="Roo-Blocks",
-            services=[upload_service_id, state_service_id]
+            services=(roo_blocks_service,)
         )
     )
 
 
 def run_program():
+    # reimport module if it's already imported
     if 'program' in sys.modules:
         del sys.modules['program']
     import program
@@ -99,11 +105,29 @@ def run_program():
 
 connection = None
 program_file = None
-prev_state = IDLE_STATE
+state = IDLE_STATE
+delay = 0
+
+
+class CancelProgram(Exception):
+    pass
+
+
+def pause(block_id):
+    print('pausing')
+    ble.gatts_notify(connection, telem_attr, block_id)
+    if state == IDLE_STATE:
+        print('throwing error')
+        raise CancelProgram
+    elif state == PAUSED_STATE:
+        while state == PAUSED_STATE:
+            time.sleep(0.5)
+    elif delay:
+        time.sleep(delay)
 
 
 def on_central_msg(event, data):
-    global connection, program_file, prev_state
+    global connection, program_file, state, delay
     print('got event', event)
 
     if event == _IRQ_CENTRAL_CONNECT:
@@ -115,21 +139,26 @@ def on_central_msg(event, data):
     elif event == _IRQ_GATTS_WRITE:
         _, attr_handle = data
         if attr_handle == state_attr:
-            state = ble.gatts_read(state_attr)
-            print('state', state)
-            if state == UPLOADING_STATE:
+            new_state = ble.gatts_read(state_attr)
+            print('state', new_state)
+            if new_state == UPLOADING_STATE:
                 program_file = open('program.py', 'wb')
                 print('opening file')
-            elif prev_state == UPLOADING_STATE:
+            elif state == UPLOADING_STATE:
                 program_file.close()
-                print('file written')
-                run_program()
-            prev_state = state
+            elif state == IDLE_STATE and new_state == EXECUTING_STATE:
+                print('running program')
+                try:
+                    run_program()
+                except CancelProgram:
+                    pass
+            state = new_state
         elif attr_handle == upload_buffer_attr:
             program_file.write(ble.gatts_read(upload_buffer_attr))
-            # time.sleep(0.)
             print('sending notify')
             ble.gatts_notify(connection, upload_buffer_attr)
+        elif attr_handle == delay_attr:
+            delay = ble.gatts_read(delay_attr)
 
 
 ble.irq(on_central_msg)

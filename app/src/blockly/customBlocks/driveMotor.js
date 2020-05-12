@@ -33,18 +33,17 @@ export default (Blockly) => {
   };
 
   Blockly.Python[BLOCK_NAME] = function (block) {
-    var value_port = Blockly.Python.valueToCode(
+    const value_port = Blockly.Python.valueToCode(
       block,
       "port",
       Blockly.Python.ORDER_ATOMIC
     );
-    var value_speed = Blockly.Python.valueToCode(
+    const value_speed = Blockly.Python.valueToCode(
       block,
       "speed",
       Blockly.Python.ORDER_ATOMIC
     );
-    // TODO: Assemble Python into code variable.
-    var code = "...\n";
-    return code;
+
+    return `roo_blocks.drive_motor(${value_port}, ${value_speed})\n`;
   };
 };

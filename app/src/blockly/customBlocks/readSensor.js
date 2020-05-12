@@ -26,14 +26,11 @@ export default (Blockly) => {
   };
 
   Blockly.Python[BLOCK_NAME] = function (block) {
-    var value_port = Blockly.Python.valueToCode(
+    const port = Blockly.Python.valueToCode(
       block,
       "port",
       Blockly.Python.ORDER_ATOMIC
     );
-    // TODO: Assemble Python into code variable.
-    var code = "...";
-    // TODO: Change ORDER_NONE to the correct strength.
-    return [code, Blockly.Python.ORDER_NONE];
+    return [`roo_blocks.read_sensor(${port})`, Blockly.Python.ORDER_NONE];
   };
 };

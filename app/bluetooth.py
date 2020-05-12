@@ -15,14 +15,19 @@ import os
 import json
 from async_timeout import timeout
 import threading
+import autopep8
 
-# these characteristics have to be copied into bluetooth.py too
+# these constants have to be copied into bluetooth.py too
 STATE_CHARACTERISTIC = "5497c8f9-6163-4fbd-b372-7a1d9e77168d"
 UPLOAD_BUFFER_CHARACTERISTIC = "aa86a5d5-95f9-4c0b-8797-44b48a85f686"
+DELAY_CHARACTERISTIC = "9d4e5866-d299-44f6-8733-6ab2d67b46b9"
+TELEM_CHARACTERISTIC = "785b926d-72fd-4b3e-bd03-e14800480792"
 # bytes that can be transferred at a time
 UPLOAD_BUFFER_CHARACTERISTIC_MTU = 512
 UPLOADING_STATE = b'uploading'
 IDLE_STATE = b'idle'
+EXECUTING_STATE = b'executing'
+PAUSED_STATE = b'paused'
 
 IPC_SOCKET = os.environ.get('IPC_SOCKET')
 
@@ -75,6 +80,7 @@ def upload_program(roo_blocks, program, progress_cb):
 
     print('setting idle')
     roo_blocks.char_write(STATE_CHARACTERISTIC, IDLE_STATE)
+    roo_blocks.unsubscribe(UPLOAD_BUFFER_CHARACTERISTIC)
     print('done!')
 
 
@@ -118,18 +124,42 @@ async def main():
                 writer.write(json_ipc('connected', roo_blocks is not None))
                 await writer.drain()
             else:
+                async def handle_telem(block_id):
+                    writer.write(json_ipc("highlight", block_id))
+                roo_blocks.subscribe(
+                    TELEM_CHARACTERISTIC, handle_telem)
                 try:
                     async with timeout(5):
                         buffer = await reader.readline()
                         if buffer:
                             msg = json.loads(buffer)
-                            print(msg)
                             if msg['type'] == 'upload':
+
                                 # this function should be async but there are some issues with implementation
                                 upload_program(
                                     roo_blocks,
                                     msg['data'],
                                     lambda progress: writer.write(json_ipc('upload', progress)))
+                                roo_blocks.char_write(
+                                    STATE_CHARACTERISTIC, EXECUTING_STATE)
+                            elif msg['type'] == 'format':
+                                writer.write(
+                                    json_ipc('formatted', autopep8.fix_code(msg['data'])))
+                                await writer.drain()
+                            elif msg['type'] == 'play':
+                                roo_blocks.char_write(
+                                    EXECUTING_STATE, EXECUTING_STATE)
+                            elif msg['type'] == 'pause':
+                                roo_blocks.char_write(
+                                    EXECUTING_STATE, PAUSED_STATE)
+                            elif msg['type'] == 'restart':
+                                roo_blocks.char_write(
+                                    EXECUTING_STATE, IDLE_STATE)
+                                roo_blocks.char_write(
+                                    EXECUTING_STATE, EXECUTING_STATE)
+                            else:
+                                raise f"unhandled message {msg}"
+
                 except asyncio.exceptions.TimeoutError:
                     pass
 
