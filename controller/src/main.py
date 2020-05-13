@@ -3,6 +3,7 @@ import bluetooth as bt
 import struct
 import time
 import sys
+import _thread
 
 # these constants have to be copied into bluetooth.py too
 STATE_CHARACTERISTIC = "5497c8f9-6163-4fbd-b372-7a1d9e77168d"
@@ -30,7 +31,7 @@ roo_blocks_service = bt.UUID(BLE_GENERIC_ACCESS_SERVICE)
     # code upload service
     (roo_blocks_service, [(
         bt.UUID(UPLOAD_BUFFER_CHARACTERISTIC),
-        bt.FLAG_NOTIFY | bt.FLAG_WRITE,
+        bt.FLAG_WRITE,
     ), (
         bt.UUID(STATE_CHARACTERISTIC),
         bt.FLAG_WRITE,
@@ -100,13 +101,15 @@ def run_program():
     # reimport module if it's already imported
     if 'program' in sys.modules:
         del sys.modules['program']
-    import program
+    from program import program
+    # run the program, handing it telemetry capabilities through "pause" callback
+    program(pause)
 
 
 connection = None
 program_file = None
 state = IDLE_STATE
-delay = 0
+delay = 1
 
 
 class CancelProgram(Exception):
@@ -114,15 +117,16 @@ class CancelProgram(Exception):
 
 
 def pause(block_id):
-    print('pausing')
-    ble.gatts_notify(connection, telem_attr, block_id)
+    if delay:
+        ble.gatts_notify(connection, telem_attr, block_id)
     if state == IDLE_STATE:
-        print('throwing error')
+        print('cancel program')
         raise CancelProgram
     elif state == PAUSED_STATE:
         while state == PAUSED_STATE:
             time.sleep(0.5)
     elif delay:
+        print('sleeping for', delay)
         time.sleep(delay)
 
 
@@ -139,20 +143,17 @@ def on_central_msg(event, data):
     elif event == _IRQ_GATTS_WRITE:
         _, attr_handle = data
         if attr_handle == state_attr:
-            new_state = ble.gatts_read(state_attr)
-            print('state', new_state)
-            if new_state == UPLOADING_STATE:
+            old_state = state
+            state = ble.gatts_read(state_attr)
+            print('state', state)
+            if state == UPLOADING_STATE:
                 program_file = open('program.py', 'wb')
                 print('opening file')
-            elif state == UPLOADING_STATE:
+            elif old_state == UPLOADING_STATE:
                 program_file.close()
-            elif state == IDLE_STATE and new_state == EXECUTING_STATE:
+            elif old_state == IDLE_STATE and state == EXECUTING_STATE:
                 print('running program')
-                try:
-                    run_program()
-                except CancelProgram:
-                    pass
-            state = new_state
+                _thread.start_new_thread(run_program)
         elif attr_handle == upload_buffer_attr:
             program_file.write(ble.gatts_read(upload_buffer_attr))
             print('sending notify')

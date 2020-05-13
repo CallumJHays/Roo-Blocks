@@ -6,7 +6,10 @@
     "dev-packages": {
         "micropy-cli": "*"
     },
-    "packages": {},
+    "packages": {
+        "micropython-uasyncio": "*",
+        "micropython-uasyncio-core": "*"
+    },
     "config": {
         "vscode": true,
         "pylint": true

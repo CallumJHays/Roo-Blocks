@@ -14,8 +14,8 @@ import time
 import os
 import json
 from async_timeout import timeout
-import threading
 import autopep8
+import concurrent.futures
 
 # these constants have to be copied into bluetooth.py too
 STATE_CHARACTERISTIC = "5497c8f9-6163-4fbd-b372-7a1d9e77168d"
@@ -44,13 +44,6 @@ def json_ipc(msg_type, data):
 def upload_program(roo_blocks, program, progress_cb):
     print('writing program to flash over ble...')
     roo_blocks.char_write(STATE_CHARACTERISTIC, UPLOADING_STATE)
-    received_notification = False
-
-    def handle_notify(_a, _b):
-        nonlocal received_notification
-        received_notification = True
-        print('received notification')
-    roo_blocks.subscribe(UPLOAD_BUFFER_CHARACTERISTIC, handle_notify)
 
     program_size = len(program)
 
@@ -80,7 +73,6 @@ def upload_program(roo_blocks, program, progress_cb):
 
     print('setting idle')
     roo_blocks.char_write(STATE_CHARACTERISTIC, IDLE_STATE)
-    roo_blocks.unsubscribe(UPLOAD_BUFFER_CHARACTERISTIC)
     print('done!')
 
 
@@ -114,6 +106,8 @@ async def main():
         await writer.drain()
 
         roo_blocks = None
+        highlighted_block_id = None
+        delay = 1
         while True:
             if roo_blocks is None:
                 print('searching for roo-blocks...')
@@ -124,8 +118,15 @@ async def main():
                 writer.write(json_ipc('connected', roo_blocks is not None))
                 await writer.drain()
             else:
-                async def handle_telem(block_id):
-                    writer.write(json_ipc("highlight", block_id))
+
+                def handle_telem(_, block_id):
+                    nonlocal highlighted_block_id
+                    if highlighted_block_id != block_id:
+                        highlighted_block_id = block_id
+                        writer.write(
+                            json_ipc("highlight", highlighted_block_id.decode()))
+                        asyncio.run(writer.drain())
+                        print('highlighted', block_id)
                 roo_blocks.subscribe(
                     TELEM_CHARACTERISTIC, handle_telem)
                 try:
@@ -133,13 +134,14 @@ async def main():
                         buffer = await reader.readline()
                         if buffer:
                             msg = json.loads(buffer)
-                            if msg['type'] == 'upload':
+                            print('got msg', msg)
+                            if msg['type'] == 'upload-and-play':
 
                                 # this function should be async but there are some issues with implementation
                                 upload_program(
                                     roo_blocks,
                                     msg['data'],
-                                    lambda progress: writer.write(json_ipc('upload', progress)))
+                                    lambda progress: writer.write(json_ipc('upload-progress', progress)))
                                 roo_blocks.char_write(
                                     STATE_CHARACTERISTIC, EXECUTING_STATE)
                             elif msg['type'] == 'format':
@@ -148,15 +150,21 @@ async def main():
                                 await writer.drain()
                             elif msg['type'] == 'play':
                                 roo_blocks.char_write(
-                                    EXECUTING_STATE, EXECUTING_STATE)
+                                    STATE_CHARACTERISTIC, EXECUTING_STATE)
                             elif msg['type'] == 'pause':
                                 roo_blocks.char_write(
-                                    EXECUTING_STATE, PAUSED_STATE)
+                                    STATE_CHARACTERISTIC, PAUSED_STATE)
                             elif msg['type'] == 'restart':
                                 roo_blocks.char_write(
-                                    EXECUTING_STATE, IDLE_STATE)
+                                    STATE_CHARACTERISTIC, IDLE_STATE)
+                                await asyncio.sleep(delay)
                                 roo_blocks.char_write(
-                                    EXECUTING_STATE, EXECUTING_STATE)
+                                    STATE_CHARACTERISTIC, EXECUTING_STATE)
+                            elif msg['type'] == 'set-delay':
+                                delay = msg['data']
+
+                                roo_blocks.char_write(
+                                    DELAY_CHARACTERISTIC, delay)
                             else:
                                 raise f"unhandled message {msg}"
 

@@ -59,7 +59,7 @@ async function formatPythonCode(code) {
   return formatted;
 }
 
-function useIpcSubscription(channel, handler) {
+function useIpcSubscription(channel, handler, deps = []) {
   useEffect(() => {
     const handle = (_, msg) => {
       handler(msg);
@@ -67,15 +67,20 @@ function useIpcSubscription(channel, handler) {
     window.ipcRenderer.on(channel, handle);
     return () => window.ipcRenderer.removeListener(channel, handle);
     // eslint-disable-next-line
-  }, []);
+  }, deps);
+}
+
+function sendIpcMsg(type, data = null) {
+  window.ipcRenderer.send("python", JSON.stringify({ type, data }));
 }
 
 function CodeExecutor({ workspace }) {
   const [uploading, setUploading] = useState(null);
   const [executing, setExecuting] = useState(false);
+  const [workspaceCode, setWorkspaceCode] = useState(null);
   const [delay, setDelay] = useState(1.0);
 
-  useIpcSubscription("upload", (progress) => {
+  useIpcSubscription("upload-progress", (progress) => {
     if (progress === 100) {
       setUploading(false);
       setExecuting(true);
@@ -92,33 +97,46 @@ function CodeExecutor({ workspace }) {
             cursor: executing ? "not-allowed" : uploading ? "wait" : "pointer",
           }}
           onClick={() => {
-            blocklyPython.STATEMENT_SUFFIX = "roo_blocks.pause(%1)\n";
-            window.ipcRenderer.send(
-              "python",
-              JSON.stringify({
-                type: "upload",
-                data:
-                  "import roo_blocks\n\n" +
-                  blocklyPython.workspaceToCode(workspace),
-              })
-            );
+            blocklyPython.STATEMENT_SUFFIX = "await pause(%1)\n";
+            const newWorkspaceCode = blocklyPython.workspaceToCode(workspace);
             blocklyPython.STATEMENT_SUFFIX = null;
-            setUploading(true);
+
+            if (newWorkspaceCode !== workspaceCode) {
+              sendIpcMsg(
+                "upload-and-play",
+                "import roo_blocks\n\nasync def program(pause):\n  " +
+                  newWorkspaceCode.replace(/\n/g, "\n  ")
+              );
+              setWorkspaceCode(newWorkspaceCode);
+              setUploading(true);
+            } else {
+              window.ipcRenderer.send(
+                "python",
+                JSON.stringify({ type: "play" })
+              );
+              setExecuting(true);
+            }
           }}
         >
           {uploading ? "Uploading" : "▶"}
         </Button>
         <Button
           variant="outline-warning"
-          disabled={true}
+          disabled={!executing}
           style={{ cursor: executing ? "pointer" : "not-allowed" }}
+          onClick={() => {
+            sendIpcMsg("pause");
+          }}
         >
           ⏸
         </Button>
         <Button
           variant="outline-danger"
-          disabled={true}
+          disabled={!executing}
           style={{ cursor: executing ? "pointer" : "not-allowed" }}
+          onClick={() => {
+            sendIpcMsg("restart");
+          }}
         >
           ↺
         </Button>
@@ -127,8 +145,12 @@ function CodeExecutor({ workspace }) {
         Delay (s) <br />
         <FormControl
           type="number"
-          value={delay}
-          onChange={(e) => setDelay(e.target.value)}
+          value={delay} // todo: limit the delay to being positive
+          onChange={(e) => {
+            const delay = e.target.valueAsNumber;
+            setDelay(delay);
+            sendIpcMsg("set-delay", delay);
+          }}
         />
       </div>
     </div>
@@ -179,7 +201,12 @@ function App() {
   // kinda effect-ful, but should be fine
   useIpcSubscription(
     "highlight",
-    workspace ? workspace.workspace.highlightBlock : () => {}
+    (block_id) => {
+      if (workspace) {
+        workspace.workspace.highlightBlock(block_id);
+      }
+    },
+    [workspace]
   );
 
   return (
