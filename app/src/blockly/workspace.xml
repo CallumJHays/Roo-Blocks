@@ -1,5 +1,5 @@
 <xml xmlns="https://developers.google.com/blockly/xml" id="workspaceBlocks" style="display: none">
-  <block type="controls_whileUntil" id="!FK3yzq.;)lZh1v|1h(." x="138" y="138">
+  <block type="controls_whileUntil" id="!FK3yzq.;)lZh1v|1h(." x="63" y="63">
     <field name="MODE">WHILE</field>
     <value name="BOOL">
       <block type="logic_boolean" id="{5c]1;1-EscWDa!65~Op">
@@ -10,18 +10,46 @@
       <block type="drive_motor" id="1IB%pj(eE{`g])~$Q2rI">
         <value name="port">
           <block type="math_number" id="J)Leh0d%`h~t(4tw~^qc">
-            <field name="NUM">4</field>
+            <field name="NUM">16</field>
           </block>
         </value>
         <value name="speed">
           <block type="read_sensor" id="/Z!T]Q.E4qIM#5XGkDRt">
             <value name="port">
               <block type="math_number" id=";YXyKh5qIEH5-K0esH$X">
-                <field name="NUM">2</field>
+                <field name="NUM">34</field>
               </block>
             </value>
           </block>
         </value>
+        <next>
+          <block type="turn_pin" id="M=k`-W!6(P9MJZyK!#US">
+            <value name="pin">
+              <block type="math_number" id="dTipqG[tJ/XyBUI?F@6/">
+                <field name="NUM">4</field>
+              </block>
+            </value>
+            <value name="on">
+              <block type="logic_compare" id="+mFqo~:G+)K!8|z_HOlA">
+                <field name="OP">GT</field>
+                <value name="A">
+                  <block type="read_sensor" id="OJC%Ct7E$C7;Qp2_AU^L">
+                    <value name="port">
+                      <block type="math_number" id="77^{RY7?ZmjhK;15;R)W">
+                        <field name="NUM">34</field>
+                      </block>
+                    </value>
+                  </block>
+                </value>
+                <value name="B">
+                  <block type="math_number" id="u+Ry1N#-hdkS40P7C5KV">
+                    <field name="NUM">50</field>
+                  </block>
+                </value>
+              </block>
+            </value>
+          </block>
+        </next>
       </block>
     </statement>
   </block>

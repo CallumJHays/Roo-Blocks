@@ -2,6 +2,7 @@
   <category name="Roo-Blocks" colour="#a5745b">
     <block type="read_sensor"></block>
     <block type="drive_motor"></block>
+    <block type="turn_pin"></block>
   </category>
   <category name="Variables" colour="#a55b80" custom="VARIABLE"></category>
   <category name="Logic" colour="#5b80a5">

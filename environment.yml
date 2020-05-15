@@ -14,5 +14,4 @@ dependencies:
       - adafruit-ampy==1.0.7
       - mpy-cross==1.12
       - pygatt[GATTTOOL]==4.0.5
-      - async-timeout==3.0.1
       - autopep8==1.5.2
