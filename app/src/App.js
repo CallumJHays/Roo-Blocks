@@ -77,7 +77,7 @@ function sendIpcMsg(type, data = null) {
 function CodeExecutor({ augmentedPythonCode }) {
   const [uploading, setUploading] = useState(null); // null == started uploading
   const [executing, setExecuting] = useState(false);
-  const [delay, setDelay] = useState(1.0);
+  const [delay, setDelay] = useState(0.1);
 
   useEffect(() => {
     setUploading(null);

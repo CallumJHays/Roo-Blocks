@@ -26,13 +26,13 @@ ble = bt.BLE()
 ble.active(True)
 
 BLE_GENERIC_ACCESS_SERVICE = const(0x1800)
-roo_blocks_service = bt.UUID(BLE_GENERIC_ACCESS_SERVICE)
+roo_blocks_service = bt.UUID("b6faa483-ce9b-4d36-822c-686352cd124c")
 
 ((upload_buffer_attr, state_attr, delay_attr, telem_attr),) = ble.gatts_register_services([
     # code upload service
     (roo_blocks_service, [(
         bt.UUID(UPLOAD_BUFFER_CHARACTERISTIC),
-        bt.FLAG_WRITE | bt.FLAG_NOTIFY,
+        bt.FLAG_WRITE,
     ), (
         bt.UUID(STATE_CHARACTERISTIC),
         bt.FLAG_WRITE,
