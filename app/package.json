@@ -8,7 +8,7 @@
     "@testing-library/user-event": "^7.2.1",
     "blockly": "^3.20200402.1",
     "bootstrap": "^4.4.1",
-    "electron": "^8.2.5",
+    "electron": "^18.3.7",
     "node-ipc": "^9.1.1",
     "raw.macro": "^0.3.0",
     "react": "^16.13.1",
